@@ -116,6 +116,9 @@ eggsCol|Eggs|Vezë
 day|Day|Dita
 nobroil|Add a broiler flock to start tracking growth.|Shto një tufë pula mishi për të ndjekur rritjen.
 bal|Balance|Bilanci
+notif_on|Notifications are on|Njoftimet janë aktive
+notif_no|Notifications are blocked. Allow them in your browser settings.|Njoftimet janë të bllokuara. Lejoji te cilësimet e shfletuesit.
+notif_help|Reminders appear while the app is open. On iPhone, add the app to your Home Screen first (Share, then Add to Home Screen).|Kujtesat shfaqen kur aplikacioni është i hapur. Në iPhone, shtoje fillimisht në Home Screen (Share, pastaj Add to Home Screen).
 l_tag|Run your egg and meat chicken farm from one simple app.|Menaxho fermën e vezëve dhe të pulave të mishit nga një aplikacion i thjeshtë.
 l_f0|Egg collection and sales|Mbledhja dhe shitja e vezëve
 l_f1|Broiler growth tracking|Ndjekja e rritjes së pulave të mishit
@@ -163,15 +166,18 @@ const rem=()=>{const a=[],d=today();
  if(D.flocks.some(f=>f.type=='layers')&&!D.eggs.some(e=>e.date==d))a.push(['🥚',t('r_eggs')]);
  if(D.flocks.length&&!D.money.some(m=>m.kind=='feed'&&m.date==d))a.push(['🌾',t('r_feed')]);
  D.health.filter(x=>!x.done&&x.date<=plus(7)).forEach(x=>a.push(['💉',`${x.title} · ${x.date}`]));return a};
-function notify(){try{if(Notification.permission=='granted')rem().forEach(a=>new Notification('Edi Farm',{body:a[1]}))}catch(e){}}
-function askNotif(){try{Notification.requestPermission().then(notify)}catch(e){}}
+const nst=()=>{try{return Notification.permission}catch(e){return 'unsupported'}};
+function notify(){try{if(Notification.permission!='granted'||!me||!D)return;const k='edi_n_'+me,d=today();let s=ls.g(k,{});if(s.d!=d)s={d,sent:[]};rem().forEach(a=>{if(!s.sent.includes(a[1])){new Notification('Edi Farm',{body:a[0]+' '+a[1],icon:LOGO});s.sent.push(a[1])}});ls.s(k,s)}catch(e){}}
+const nbox=()=>{const s=nst();return s=='granted'?`<p class=mut>🔔 ${t('notif_on')}</p>`:s=='denied'?`<p class=neg>${t('notif_no')}</p>`:s=='unsupported'?`<p class=mut>${t('notif_help')}</p>`:`<button class=pri onclick="askNotif()">🔔 ${t('notif')}</button><p class=mut><small>${t('notif_help')}</small></p>`};
+setInterval(notify,600000);
+function askNotif(){try{Notification.requestPermission().then(p=>{render();if(p=='granted'){notify();new Notification('Edi Farm',{body:'🔔 '+t('notif_on'),icon:LOGO})}})}catch(e){render()}}
 const fmt=n=>(Math.round(n*100)/100).toLocaleString(lang=='sq'?'sq-AL':'en');
 const sc=(n,l,c='')=>`<div class=stat><div class="num ${c}">${n}</div><span>${l}</span></div>`;
 const V={
 home(){const m=today().slice(0,7),f=fin(m),r=rem();
  return `<div class=grid>${sc(sum(D.flocks,x=>x.count),t('birds'))}${sc(sum(D.eggs.filter(e=>e.date==today()),e=>e.n),t('eggsToday'))}${sc(sum(D.eggs.filter(e=>e.date.startsWith(m)),e=>e.n),t('eggsMonth'))}${sc(fmt(f.pr),t('profit'),f.pr<0?'neg':'')}</div>
  <h2>${t('reminders')}</h2><ul>${r.map(a=>`<li><span style="margin:0">${a[0]}</span>${esc(a[1])}</li>`).join('')||`<p class=mut>${t('r_clear')}</p>`}</ul>
- <h2>${t('myfarm')}</h2><form onsubmit="D.farm=v('fm').trim();save();render();return false"><label>${t('farm')}<input id=fm value="${esc(D.farm)}"></label><button class=pri>${t('add')}</button></form>`},
+ ${nbox()}<h2>${t('myfarm')}</h2><form onsubmit="D.farm=v('fm').trim();save();render();return false"><label>${t('farm')}<input id=fm value="${esc(D.farm)}"></label><button class=pri>${t('add')}</button></form>`},
 flocks:()=>sec('flocks'),eggs:()=>sec('eggs')+sec('sales'),
 broilers(){const bs=D.flocks.filter(f=>f.type=='broiler');
  const sm=bs.map(f=>{const w=D.weights.filter(x=>x.flock==f.id).sort((a,b)=>a.date<b.date?-1:1),l=w[w.length-1],p=w[w.length-2];
@@ -179,7 +185,7 @@ broilers(){const bs=D.flocks.filter(f=>f.type=='broiler');
   return `<li><b>${esc(f.name)}</b><span>${t('day')} ${age}${l?` · ${l.avg} kg${p?` (+${fmt(l.avg-p.avg)})`:''}`:''}</span></li>`}).join('');
  return (bs.length?`<ul>${sm}</ul>`:`<p class=box>${t('nobroil')}</p>`)+sec('weights')},
 money(){const f=fin();return `<div class=grid>${sc(fmt(f.inc),t('income'),'pos')}${sc(fmt(f.exp),t('expenses'),'neg')}</div>${sec('money')}`},
-health:()=>sec('health')+`<p><button class=pri onclick="askNotif()">🔔 ${t('notif')}</button></p>`,
+health:()=>sec('health')+`${nbox()}`,
 reports(){const ms=[...new Set([...D.eggs,...D.sales,...D.money].map(r=>r.date.slice(0,7)))].sort().reverse();
  return `<h2>${t('tab_reports')}</h2>`+(ms.length?`<div class=tw><table><tr><th>${t('month')}</th><th>${t('eggsCol')}</th><th>${t('income')}</th><th>${t('expenses')}</th><th>${t('bal')}</th></tr>${ms.map(m=>{const f=fin(m);return `<tr><td>${m}</td><td>${fmt(sum(D.eggs.filter(e=>e.date.startsWith(m)),e=>e.n))}</td><td>${fmt(f.inc)}</td><td>${fmt(f.exp)}</td><td class="${f.pr<0?'neg':'pos'}"><b>${fmt(f.pr)}</b></td></tr>`}).join('')}</table></div>`:`<p class=mut>${t('empty')}</p>`)}};
 const flash=(m,ok)=>{if(ok)render();const e=$('#msg');e.textContent=m;e.className=ok?'ok':'err'};
@@ -200,6 +206,6 @@ function render(){document.documentElement.lang=lang;const lb=`<button onclick="
  <div class=links>${m=='login'?`<button onclick="setMode('register')">${t('noacc')}</button><button onclick="setMode('reset')">${t('forgot')}</button>`:`<button onclick="setMode('login')">${t('haveacc')}</button>`}</div><small>${t('demo')}</small><p class=pw>Powered by: RidvanM</p></main>`;return}
  if(!D)load();
  $('#app').innerHTML=`<header><img src="${LOGO}" alt=""><b>${esc(D.farm||'Edi Farm')}</b>${lb}<button onclick="out()">${t('logout')}</button></header>
- <nav>${TABS.map(x=>`<button class="${x==tab?'on':''}" onclick="tab='${x}';render()">${t('tab_'+x)}</button>`).join('')}</nav><main>${V[tab]()}</main>`}
+ <nav>${TABS.map(x=>`<button class="${x==tab?'on':''}" onclick="tab='${x}';render()">${t('tab_'+x)}</button>`).join('')}</nav><main>${V[tab]()}</main>`;notify()}
 render();
 </script></body></html>
