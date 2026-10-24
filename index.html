@@ -25,7 +25,7 @@ main{max-width:640px;margin:0 auto;padding:1rem .9rem 3rem}
 .stat .num{font-size:1.7rem;color:var(--leaf)}.stat span{display:block;color:var(--mut);font-size:.85rem}
 form,.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:.8rem;display:grid;gap:.6rem}
 label{display:grid;gap:.2rem;font-weight:700;font-size:.88rem}
-input,select{font:inherit;padding:.6rem;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);width:100%}
+input,select,textarea{font:inherit;padding:.6rem;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);width:100%}
 input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--gold);outline-offset:1px}
 .pri{background:var(--wood);color:var(--gold);border:0;border-radius:10px;padding:.7rem;font:800 1rem Nunito,sans-serif}
 ul{list-style:none;margin:.6rem 0 0;padding:0;display:grid;gap:.4rem}
@@ -116,6 +116,15 @@ eggsCol|Eggs|Vezë
 day|Day|Dita
 nobroil|Add a broiler flock to start tracking growth.|Shto një tufë pula mishi për të ndjekur rritjen.
 bal|Balance|Bilanci
+backup|Backup & restore|Kopje rezervë & rikthim
+b_help|Save a backup file now and then. To restore, choose the file or paste its text.|Ruaj herë pas here një kopje. Për ta rikthyer, zgjidh skedarin ose ngjit tekstin e saj.
+b_save|Save backup|Ruaj kopjen
+b_load|Restore from backup|Rikthe nga kopja
+b_file|Choose backup file|Zgjidh skedarin e kopjes
+b_paste|Or paste backup text here|Ose ngjit tekstin e kopjes këtu
+b_ok|Backup saved. If no file appeared, copy the text from the box below.|Kopja u ruajt. Nëse nuk u shfaq skedar, kopjo tekstin nga kutia më poshtë.
+b_done|Records restored.|Të dhënat u rikthyen.
+b_bad|That backup is not valid.|Kopja nuk është e vlefshme.
 notif_on|Notifications are on|Njoftimet janë aktive
 notif_no|Notifications are blocked. Allow them in your browser settings.|Njoftimet janë të bllokuara. Lejoji te cilësimet e shfletuesit.
 notif_help|Reminders appear while the app is open. On iPhone, add the app to your Home Screen first (Share, then Add to Home Screen).|Kujtesat shfaqen kur aplikacioni është i hapur. Në iPhone, shtoje fillimisht në Home Screen (Share, pastaj Add to Home Screen).
@@ -170,6 +179,11 @@ const nst=()=>{try{return Notification.permission}catch(e){return 'unsupported'}
 function notify(){try{if(Notification.permission!='granted'||!me||!D)return;const k='edi_n_'+me,d=today();let s=ls.g(k,{});if(s.d!=d)s={d,sent:[]};rem().forEach(a=>{if(!s.sent.includes(a[1])){new Notification('Edi Farm',{body:a[0]+' '+a[1],icon:LOGO});s.sent.push(a[1])}});ls.s(k,s)}catch(e){}}
 const nbox=()=>{const s=nst();return s=='granted'?`<p class=mut>🔔 ${t('notif_on')}</p>`:s=='denied'?`<p class=neg>${t('notif_no')}</p>`:s=='unsupported'?`<p class=mut>${t('notif_help')}</p>`:`<button class=pri onclick="askNotif()">🔔 ${t('notif')}</button><p class=mut><small>${t('notif_help')}</small></p>`};
 setInterval(notify,600000);
+const bk=()=>`<h2>${t('backup')}</h2><div class=box><small class=mut>${t('b_help')}</small><button class=pri onclick="doBk()">${t('b_save')}</button><label>${t('b_file')}<input type=file accept=".json,application/json" onchange="rdBk(this.files[0])"></label><label>${t('b_paste')}<textarea id=bt rows=3></textarea></label><button class=pri onclick="doRs(v('bt'))">${t('b_load')}</button><p id=bm role=status class=mut></p></div>`;
+const bm=m=>{const e=$('#bm');if(e)e.textContent=m};
+function doBk(){const s=JSON.stringify(D);$('#bt').value=s;try{navigator.clipboard.writeText(s)}catch(e){}try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([s],{type:'application/json'}));a.download='edi-farm-backup-'+today()+'.json';document.body.appendChild(a);a.click();a.remove()}catch(e){}bm(t('b_ok'))}
+function doRs(s){try{const o=JSON.parse(s);if(!o||!Array.isArray(o.flocks))throw 0;D=Object.assign({farm:'',flocks:[],eggs:[],sales:[],weights:[],money:[],health:[]},o);save();render();bm(t('b_done'))}catch(e){bm(t('b_bad'))}}
+function rdBk(f){if(!f)return;const r=new FileReader();r.onload=()=>doRs(r.result);r.readAsText(f)}
 function askNotif(){try{Notification.requestPermission().then(p=>{render();if(p=='granted'){notify();new Notification('Edi Farm',{body:'🔔 '+t('notif_on'),icon:LOGO})}})}catch(e){render()}}
 const fmt=n=>(Math.round(n*100)/100).toLocaleString(lang=='sq'?'sq-AL':'en');
 const sc=(n,l,c='')=>`<div class=stat><div class="num ${c}">${n}</div><span>${l}</span></div>`;
@@ -177,7 +191,7 @@ const V={
 home(){const m=today().slice(0,7),f=fin(m),r=rem();
  return `<div class=grid>${sc(sum(D.flocks,x=>x.count),t('birds'))}${sc(sum(D.eggs.filter(e=>e.date==today()),e=>e.n),t('eggsToday'))}${sc(sum(D.eggs.filter(e=>e.date.startsWith(m)),e=>e.n),t('eggsMonth'))}${sc(fmt(f.pr),t('profit'),f.pr<0?'neg':'')}</div>
  <h2>${t('reminders')}</h2><ul>${r.map(a=>`<li><span style="margin:0">${a[0]}</span>${esc(a[1])}</li>`).join('')||`<p class=mut>${t('r_clear')}</p>`}</ul>
- ${nbox()}<h2>${t('myfarm')}</h2><form onsubmit="D.farm=v('fm').trim();save();render();return false"><label>${t('farm')}<input id=fm value="${esc(D.farm)}"></label><button class=pri>${t('add')}</button></form>`},
+ ${nbox()}<h2>${t('myfarm')}</h2><form onsubmit="D.farm=v('fm').trim();save();render();return false"><label>${t('farm')}<input id=fm value="${esc(D.farm)}"></label><button class=pri>${t('add')}</button></form>${bk()}`},
 flocks:()=>sec('flocks'),eggs:()=>sec('eggs')+sec('sales'),
 broilers(){const bs=D.flocks.filter(f=>f.type=='broiler');
  const sm=bs.map(f=>{const w=D.weights.filter(x=>x.flock==f.id).sort((a,b)=>a.date<b.date?-1:1),l=w[w.length-1],p=w[w.length-2];
